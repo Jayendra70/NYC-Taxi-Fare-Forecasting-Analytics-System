@@ -156,7 +156,26 @@ def predict_fare(payload: PredictionRequest):
             input_data[f'DO_Borough_{b}'] = 1.0 if do_borough_name == b else 0.0
 
         route_id_str = str((pu_zone * 1000) + do_zone)
-        input_data['historical_route_fare'] = route_means.get(route_id_str, 18.50)
+        
+        # --- THE SYNTHETIC METER (Dynamic Fallback for Sparse Routes) ---
+        if route_id_str in route_means:
+            historical_val = route_means[route_id_str]
+        else:
+            # 1. Base Drop
+            synthetic_fare = 3.00 
+            
+            # 2. Distance Rate ($3.50 per mile)
+            synthetic_fare += (input_data["trip_miles"] * 3.50)
+            
+            # 3. Traffic/Time Penalty ($0.70 per minute under 12mph)
+            if input_data.get("implied_speed_mph", 20) < 12:
+                # Assuming trip_time is in seconds based on your notebook
+                trip_mins = input_data["trip_time"] / 60.0 
+                synthetic_fare += (trip_mins * 0.70)
+                
+            historical_val = synthetic_fare
+            
+        input_data['historical_route_fare'] = historical_val
 
         # Enforce exact column order required by XGBoost
         df_input = pd.DataFrame([input_data]).reindex(columns=MODEL_FEATURES)
