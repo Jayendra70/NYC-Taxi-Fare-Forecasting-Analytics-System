@@ -536,11 +536,10 @@ function App() {
         {fare && (
           <div className="results-card" id="results-card">
             
-            {/* We calculate the tip dynamically on the frontend */}
             <div className="results-header">
-              <span className="results-label">Estimated Total (w/ 20% Tip)</span>
+              <span className="results-label">Estimated Total (w/ Tip & Tolls)</span>
               <span className="results-fare">
-                ${(fare.predicted_fare + (fare.predicted_fare * 0.20)).toFixed(2)}
+                ${(fare.predicted_fare + (fare.predicted_fare * 0.20) + (fare.tolls || 0)).toFixed(2)}
               </span>
             </div>
             
@@ -582,6 +581,13 @@ function App() {
                 <div className="breakdown-item">
                   <span className="breakdown-label">Airport Access/Area Fees</span>
                   <span className="breakdown-value">${fare.breakdown.surcharges.airport_fees.toFixed(2)}</span>
+                </div>
+              )}
+
+              {fare.tolls > 0 && (
+                <div className="breakdown-item" style={{ color: "#d32f2f", fontWeight: "bold" }}>
+                  <span className="breakdown-label">Bridge / Tunnel Tolls</span>
+                  <span className="breakdown-value">+ ${fare.tolls.toFixed(2)}</span>
                 </div>
               )}
 

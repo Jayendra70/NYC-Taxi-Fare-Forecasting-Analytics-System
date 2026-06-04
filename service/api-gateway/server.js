@@ -41,18 +41,47 @@ app.post('/predict', async (req, res) => {
         let finalPayload = { ...restOfPayload };
         let tripTollCost = 0.0;
 
+       // [UPGRADE]: Google Routes API with Toll Calculation
         try {
             if (GOOGLE_API_KEY) {
-                const googleUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${puLat},${puLng}&destinations=${doLat},${doLng}&departure_time=now&key=${GOOGLE_API_KEY}`;
-                const mapRes = await axios.get(googleUrl, { timeout: 4000 });
-                if (mapRes.data.status === 'OK' && mapRes.data.rows[0].elements[0].status === 'OK') {
-                    const trafficData = mapRes.data.rows[0].elements[0];
-                    finalPayload.trip_miles = trafficData.distance.value / 1609.34;
-                    finalPayload.trip_time = trafficData.duration_in_traffic ? trafficData.duration_in_traffic.value : trafficData.duration.value;
+                const routesUrl = 'https://routes.googleapis.com/directions/v2:computeRoutes';
+                const routesBody = {
+    origin: { location: { latLng: { latitude: puLat, longitude: puLng } } },
+    destination: { location: { latLng: { latitude: doLat, longitude: doLng } } },
+    travelMode: "DRIVE",
+    routingPreference: "TRAFFIC_AWARE",
+    extraComputations: ["TOLLS"] // <--- The correct v2 schema
+};
+                
+                // We use a FieldMask to tell Google EXACTLY what data we want back to save bandwidth
+                const routesHeaders = {
+                    'Content-Type': 'application/json',
+                    'X-Goog-Api-Key': GOOGLE_API_KEY,
+                    'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.travelAdvisory.tollInfo'
+                };
+
+                const mapRes = await axios.post(routesUrl, routesBody, { headers: routesHeaders, timeout: 10000 });
+                const routeData = mapRes.data.routes[0];
+
+                if (routeData) {
+                    // 1. Extract Distance & Time
+                    finalPayload.trip_miles = routeData.distanceMeters / 1609.34;
+                    finalPayload.trip_time = parseInt(routeData.duration.replace('s', '')); 
+
+                    // 2. Extract Tolls (If they exist on this route)
+                    if (routeData.travelAdvisory && routeData.travelAdvisory.tollInfo) {
+                        const tolls = routeData.travelAdvisory.tollInfo.estimatedPrice;
+                        if (tolls && tolls.length > 0) {
+                            // Extract the USD toll amount
+                            tripTollCost = parseFloat(tolls[0].units || 0) + parseFloat((tolls[0].nanos || 0) / 1000000000);
+                            console.log(`🌉 Toll Detected! Cost: $${tripTollCost.toFixed(2)}`);
+                        }
+                    }
                 }
             }
-        } catch (e) {
-            console.warn("⚠️ Traffic API failed. Reason:", e.response ? e.response.data : e.message);                   //////
+       } catch (e) {
+    console.error("❌ Routes API Error Details:", e.response?.data || e.message);
+    console.warn("⚠️ Routes API failed. Relying on mathematical estimation.");
 }
 
         const nycDate = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
@@ -71,8 +100,13 @@ app.post('/predict', async (req, res) => {
              finalPayload.snow = 0.0;
         }
 
-        const pythonResponse = await axios.post(`${PYTHON_URL}/predict`, finalPayload, { timeout: 8000 });          ///////
-        res.json(pythonResponse.data);
+        const pythonResponse = await axios.post(`${PYTHON_URL}/predict`, finalPayload, { timeout: 8000 });
+        
+        res.json({
+            predicted_fare: pythonResponse.data.predicted_fare,
+            breakdown: pythonResponse.data.breakdown,
+            tolls: tripTollCost // Sending the toll cost to the frontend!
+        });
 
     } catch (error) {
         console.error('Gateway Error:', error.message);
