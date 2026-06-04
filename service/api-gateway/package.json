@@ -1,0 +1,26 @@
+{
+  "name": "nyc-taxi-api-gateway",
+  "version": "1.0.0",
+  "description": "Express.js API Gateway that enriches requests with Google Maps traffic data and proxies to the ML inference service.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "nyc",
+    "taxi",
+    "fare-prediction",
+    "api-gateway"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@turf/turf": "^7.3.5",
+    "axios": "^1.16.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}
