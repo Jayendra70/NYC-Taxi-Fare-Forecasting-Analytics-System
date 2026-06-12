@@ -3,6 +3,8 @@
   "private": true,
   "version": "1.0.0",
   "description": "React frontend for the NYC Taxi Fare Predictor with interactive map-based pickup/dropoff selection.",
+  "author": "Jayendra Singh",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
