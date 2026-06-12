@@ -13,8 +13,12 @@
     "fare-prediction",
     "api-gateway"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Jayendra Singh",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/nyc-taxi-predictor.git"
+  },
   "type": "commonjs",
   "dependencies": {
     "@turf/turf": "^7.3.5",

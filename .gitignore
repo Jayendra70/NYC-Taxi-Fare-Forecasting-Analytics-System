@@ -20,6 +20,7 @@ build/
 .venv/
 venv/
 ENV/
+.ipynb_checkpoints/
 
 # ==========================
 # Node.js
@@ -50,6 +51,7 @@ dist-ssr/
 # Data (too large for git)
 # ==========================
 service/ml-inference/data/fact_trips_final.csv
+*.parquet
 
 # ==========================
 # IDE & OS
