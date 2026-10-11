@@ -17,7 +17,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_USERNAME/nyc-taxi-predictor.git"
+    "url": "https://github.com/Jayendra70/NYC-Taxi-Fare-Forecasting-Analytics-System.git"
   },
   "type": "commonjs",
   "dependencies": {

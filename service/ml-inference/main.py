@@ -1,7 +1,15 @@
 """
 NYC Taxi Fare Prediction — ML Inference Service (Speed-Optimized)
+
+Loads the XGBoost model exported by notebooks/02_full_year_model_training.ipynb
+and serves POST /predict. The feature order is read from the trained model
+itself (feature_names_in_), so the service and the notebook cannot drift apart.
+
+Model path: production_taxi_master_model_2024.joblib next to this file, or set
+TAXI_MODEL_PATH. The model is not committed (too large for git); see the README.
 """
 import logging
+import os
 from pathlib import Path
 import json
 import joblib
@@ -10,28 +18,26 @@ from fastapi import FastAPI, HTTPException # type: ignore
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 from pydantic import BaseModel, Field # type: ignore
 
+from features import BOROUGHS, NOTEBOOK_02_FEATURES
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(message)s")
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="NYC Taxi Fare Prediction Microservice", version="3.1.1")
+app = FastAPI(title="NYC Taxi Fare Prediction Microservice", version="3.2.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = Path(os.getenv("TAXI_MODEL_PATH", str(BASE_DIR / "production_taxi_master_model_2024.joblib")))
+
 
 try:
-    # Updated to the new master model filename
-    model = joblib.load(BASE_DIR / "production_taxi_master_model_2024.joblib")
-    
-    # FIXED: 'implied_speed_mph' is now at index 13, matching the Jupyter Notebook order exactly
-    MODEL_FEATURES = [
-        'PULocationID', 'DOLocationID', 'trip_miles', 'trip_time', 
-        'shared_match_flag', 'wav_match_flag', 'access_a_ride_flag', 
-        'request_hour', 'is_weekend', 'is_airport_trip', 'temp', 'precip', 'snow', 
-        'implied_speed_mph', 
-        'PU_Borough_Bronx', 'PU_Borough_Brooklyn', 'PU_Borough_EWR', 'PU_Borough_Manhattan', 'PU_Borough_Queens', 'PU_Borough_Staten Island', 
-        'DO_Borough_Bronx', 'DO_Borough_Brooklyn', 'DO_Borough_EWR', 'DO_Borough_Manhattan', 'DO_Borough_Queens', 'DO_Borough_Staten Island', 
-        'historical_route_fare'
-    ]
+    model = joblib.load(MODEL_PATH)
+
+    # Ask the model which columns, in which order, it was trained on. The old
+    # hardcoded list added PULocationID/DOLocationID, which notebook 02 never
+    # trains on, so XGBoost rejected every request with a feature_names mismatch.
+    trained_on = getattr(model, "feature_names_in_", None)
+    MODEL_FEATURES = [str(c) for c in trained_on] if trained_on is not None else NOTEBOOK_02_FEATURES
 
     zones_df = pd.read_csv(BASE_DIR / "data" / "dim_localizacao.csv")
     zones_df.rename(columns={"localizacao_id": "LocationID", "bairro": "Borough"}, inplace=True)
@@ -47,7 +53,7 @@ try:
     except FileNotFoundError:
         route_means = {}
 
-    logger.info("✅ Speed-Optimized Model and artifacts loaded successfully.")
+    logger.info("✅ Model loaded from %s (%d features) and artifacts ready.", MODEL_PATH, len(MODEL_FEATURES))
 except Exception as exc:
     logger.critical("Failed to load model artifacts: %s", exc)
     raise RuntimeError(f"Failed to load critical artifacts: {exc}") from exc
@@ -64,7 +70,7 @@ class PredictionRequest(BaseModel):
     wait_time_mins: float = Field(0, ge=0)
     request_hour: int = Field(..., ge=0, le=23)
     is_weekend: int = Field(..., ge=0, le=1)
-    is_airport_trip: int = Field(0, ge=0, le=1) 
+    is_airport_trip: int = Field(0, ge=0, le=1)
     temp: float = Field(...)
     precip: float = Field(0, ge=0)
     snow: float = Field(0, ge=0)
@@ -131,6 +137,20 @@ def calculate_tlc_surcharges(pu_zone: int, do_zone: int, pu_borough: int, do_bor
     }
 
 
+def synthetic_meter_fare(trip_miles: float, trip_time_seconds: float) -> float:
+    """Deterministic TLC-meter estimate for routes with no fare history.
+
+    The meter charges $0.70 per 1/5 mile while the cab moves faster than
+    12 mph and $0.70 per minute while it is slower, never both at once, so the
+    units are roughly max(5 x miles, minutes). The old fallback added the full
+    time charge on top of the full distance charge for slow trips: on Jan 2024
+    trips it missed by $5.18 on average, against $2.73 for this version
+    (notebooks/03_baselines_and_input_error.ipynb).
+    """
+    minutes = trip_time_seconds / 60.0
+    return 3.00 + 0.70 * max(5.0 * trip_miles, minutes)
+
+
 @app.post("/predict", response_model=PredictionResponse)
 def predict_fare(payload: PredictionRequest):
     try:
@@ -151,40 +171,32 @@ def predict_fare(payload: PredictionRequest):
 
         input_data["is_airport_trip"] = 1 if (pu_zone in {132, 138, 1} or do_zone in {132, 138, 1}) else 0
 
-        for b in ['Bronx', 'Brooklyn', 'EWR', 'Manhattan', 'Queens', 'Staten Island']:
+        for b in BOROUGHS:
             input_data[f'PU_Borough_{b}'] = 1.0 if pu_borough_name == b else 0.0
             input_data[f'DO_Borough_{b}'] = 1.0 if do_borough_name == b else 0.0
 
         route_id_str = str((pu_zone * 1000) + do_zone)
-        
+
         # --- THE SYNTHETIC METER (Dynamic Fallback for Sparse Routes) ---
         if route_id_str in route_means:
             historical_val = route_means[route_id_str]
         else:
-            # 1. Base Drop
-            synthetic_fare = 3.00 
-            
-            # 2. Distance Rate ($3.50 per mile)
-            synthetic_fare += (input_data["trip_miles"] * 3.50)
-            
-            # 3. Traffic/Time Penalty ($0.70 per minute under 12mph)
-            if input_data.get("implied_speed_mph", 20) < 12:
-                # Assuming trip_time is in seconds based on your notebook
-                trip_mins = input_data["trip_time"] / 60.0 
-                synthetic_fare += (trip_mins * 0.70)
-                
-            historical_val = synthetic_fare
-            
+            historical_val = synthetic_meter_fare(input_data["trip_miles"], input_data["trip_time"])
+
         input_data['historical_route_fare'] = historical_val
+
+        missing = [c for c in MODEL_FEATURES if c not in input_data]
+        if missing:
+            raise ValueError(f"Model expects features the service does not build: {missing}")
 
         # Enforce exact column order required by XGBoost
         df_input = pd.DataFrame([input_data]).reindex(columns=MODEL_FEATURES)
         base_ml_fare = float(model.predict(df_input)[0])
 
-        base_fare = max(3.00, base_ml_fare) 
-        
+        base_fare = max(3.00, base_ml_fare)
+
         is_manhattan_jfk = ((pu_borough_id == MANHATTAN_BOROUGH_ID and do_zone == JFK_ZONE) or (pu_zone == JFK_ZONE and do_borough_id == MANHATTAN_BOROUGH_ID))
-        if is_manhattan_jfk: base_fare = 70.00 
+        if is_manhattan_jfk: base_fare = 70.00
 
         surcharges = calculate_tlc_surcharges(pu_zone, do_zone, pu_borough_id, do_borough_id, hour, is_wknd)
         final_fare = base_fare + surcharges["total_surcharges"]
