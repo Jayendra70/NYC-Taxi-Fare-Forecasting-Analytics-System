@@ -144,7 +144,7 @@ def synthetic_meter_fare(trip_miles: float, trip_time_seconds: float) -> float:
     12 mph and $0.70 per minute while it is slower, never both at once, so the
     units are roughly max(5 x miles, minutes). The old fallback added the full
     time charge on top of the full distance charge for slow trips: on Jan 2024
-    trips it missed by $5.18 on average, against $2.73 for this version
+    trips it missed by $5.18 on average, against $2.63 for this version
     (notebooks/03_baselines_and_input_error.ipynb).
     """
     minutes = trip_time_seconds / 60.0
