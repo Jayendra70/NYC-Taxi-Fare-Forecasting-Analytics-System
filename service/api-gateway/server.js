@@ -95,7 +95,11 @@ app.post('/predict', async (req, res) => {
             finalPayload.precip = weatherRes.data.current.precipitation;
             finalPayload.snow = weatherRes.data.current.snowfall;
         } catch(e) {
-             finalPayload.temp = 65;
+             // Fallback when Open-Meteo is unreachable. The model was trained on
+             // Celsius temperatures (dim_clima), so this must be Celsius too:
+             // 13 °C is roughly NYC's annual mean. (It used to send 65, a
+             // Fahrenheit value, far outside anything the model saw.)
+             finalPayload.temp = 13.0;
              finalPayload.precip = 0.0;
              finalPayload.snow = 0.0;
         }

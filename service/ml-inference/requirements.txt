@@ -1,8 +1,12 @@
+# Inference service. The ML pins match the environment notebook 02 trained and
+# pickled the model in (pandas 3.0.3, numpy 2.4.6, xgboost 3.2.0,
+# scikit-learn 1.9.0, joblib 1.5.3): an XGBoost pickle does not load reliably
+# into an older XGBoost, so keep these in step with the training notebook.
 fastapi==0.115.0
 uvicorn==0.30.6
 pydantic==2.9.2
-pandas==2.2.3
-numpy==1.26.4
-xgboost==2.1.1
-joblib==1.4.2
-scikit-learn==1.5.2
+pandas==3.0.3
+numpy==2.4.6
+xgboost==3.2.0
+joblib==1.5.3
+scikit-learn==1.9.0
