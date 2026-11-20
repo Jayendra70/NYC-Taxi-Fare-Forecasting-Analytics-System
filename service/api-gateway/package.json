@@ -1,11 +1,12 @@
 {
   "name": "nyc-taxi-api-gateway",
   "version": "1.0.0",
-  "description": "Express.js API Gateway that enriches requests with Google Maps traffic data and proxies to the ML inference service.",
+  "description": "Express gateway: resolves TLC zones, adds route and weather data, and forwards trips to the ML service.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node --watch server.js",
+    "test": "node --test"
   },
   "keywords": [
     "nyc",
@@ -25,6 +26,13 @@
     "axios": "^1.16.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.5"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.2"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
