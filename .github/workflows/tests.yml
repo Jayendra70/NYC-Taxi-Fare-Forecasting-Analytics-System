@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  inference-service:
+  ml-inference:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -17,7 +17,37 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: service/ml-inference/requirements*.txt
-      - name: Install the service and test dependencies
-        run: pip install -r requirements-dev.txt
-      - name: Run tests (a small stand-in model replaces the real one)
-        run: pytest -q
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: pytest -q
+
+  api-gateway:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: service/api-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: service/api-gateway/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  web-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: service/web-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: service/web-frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
