@@ -236,7 +236,7 @@ Select the `.venv` kernel in your notebook editor, then run top to bottom. The n
 
 ```
 NYC-Taxi-Fare-Forecasting-Analytics-System/
-├── README.md, CONTRIBUTING.md, LICENSE, .editorconfig, .gitignore
+├── README.md, LICENSE, .editorconfig, .gitignore
 ├── .github/workflows/tests.yml   # CI: runs the inference-service tests
 ├── notebooks/                    # 01 EDA · 02 current model · 03 baselines · 04 full-year retrain
 │   └── plots/                    # EDA and evaluation charts
@@ -347,12 +347,6 @@ NYC-Taxi-Fare-Forecasting-Analytics-System/
 - [ ] Request rate limiting on the API gateway
 - [ ] Trip history panel to compare multiple fare estimates
 - [ ] Mapbox GL for higher-quality map tiles
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
