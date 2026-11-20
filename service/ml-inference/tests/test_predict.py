@@ -1,13 +1,8 @@
-"""
-Smoke tests for POST /predict against the stand-in model from conftest.py.
-
-They catch the bug that broke the service before: main.py used a hardcoded
-feature list that did not match what notebook 02 trains on.
-"""
+"""End-to-end tests for the HTTP API, run against the stand-in model from conftest.py."""
 from fastapi.testclient import TestClient
 
 import main
-from features import NOTEBOOK_02_FEATURES
+from features import FEATURES
 
 client = TestClient(main.app)
 
@@ -22,8 +17,14 @@ TRIP = {
 }
 
 
+def test_health_reports_the_loaded_model():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["features"] == len(FEATURES)
+
+
 def test_service_uses_the_models_own_feature_order():
-    assert main.MODEL_FEATURES == NOTEBOOK_02_FEATURES
+    assert main.MODEL_FEATURES == FEATURES
 
 
 def test_predict_returns_a_fare_with_breakdown():
@@ -45,3 +46,9 @@ def test_manhattan_to_jfk_is_the_70_dollar_flat_fare():
 def test_rejects_zone_outside_tlc_range():
     response = client.post("/predict", json=dict(TRIP, PULocationID=999))
     assert response.status_code == 422
+
+
+def test_unknown_route_falls_back_to_the_meter_estimate(monkeypatch):
+    monkeypatch.setattr(main, "ROUTE_MEANS", {})
+    features = main.build_features(main.PredictionRequest(**TRIP))
+    assert features["historical_route_fare"].item() == main.synthetic_meter_fare(TRIP["trip_miles"], TRIP["trip_time"])
