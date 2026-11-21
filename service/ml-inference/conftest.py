@@ -9,7 +9,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-import joblib
 import numpy as np
 import pandas as pd
 import xgboost as xgb
@@ -36,12 +35,11 @@ def _train_stand_in_model(path):
     X["DO_Borough_Manhattan"] = 1.0
     fare = 3.0 + 0.7 * np.maximum(5 * miles, seconds / 60)
     X["historical_route_fare"] = fare + rng.normal(0, 1, n)
-    model = xgb.XGBRegressor(n_estimators=30, max_depth=3, random_state=0)
-    model.fit(X, fare)
-    joblib.dump(model, path)
+    booster = xgb.train({"max_depth": 3, "seed": 0}, xgb.DMatrix(X, label=fare), num_boost_round=30)
+    booster.save_model(path)
 
 
 if "TAXI_MODEL_PATH" not in os.environ:
-    _model_path = Path(tempfile.mkdtemp()) / "stand_in_model.joblib"
+    _model_path = Path(tempfile.mkdtemp()) / "stand_in_model.ubj"
     _train_stand_in_model(_model_path)
     os.environ["TAXI_MODEL_PATH"] = str(_model_path)

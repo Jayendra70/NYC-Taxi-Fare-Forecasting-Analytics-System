@@ -11,8 +11,8 @@ import logging
 import os
 from pathlib import Path
 
-import joblib
 import pandas as pd
+import xgboost as xgb
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger("ml-inference")
 
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = Path(os.getenv("TAXI_MODEL_PATH", BASE_DIR / "production_taxi_master_model_2024.joblib"))
+MODEL_PATH = Path(os.getenv("TAXI_MODEL_PATH", BASE_DIR / "model.ubj"))
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 
 JFK_ZONE, LGA_ZONE, NEWARK_ZONE = 132, 138, 1
@@ -49,11 +49,11 @@ def load_route_means() -> dict[str, float]:
     return json.loads(path.read_text())
 
 
-model = joblib.load(MODEL_PATH)
-# A model saved with feature names knows its own column order; fall back to
-# the list in features.py for one that was not.
-trained_on = getattr(model, "feature_names_in_", None)
-MODEL_FEATURES = [str(c) for c in trained_on] if trained_on is not None else FEATURES
+model = xgb.Booster()
+model.load_model(MODEL_PATH)
+# The saved model carries its own column names and order; features.py is the
+# fallback for a model saved without them.
+MODEL_FEATURES = model.feature_names or FEATURES
 ZONE_TO_BOROUGH = load_zone_boroughs()
 ROUTE_MEANS = load_route_means()
 logger.info("Loaded model from %s (%d features, %d routes)", MODEL_PATH, len(MODEL_FEATURES), len(ROUTE_MEANS))
@@ -69,9 +69,6 @@ class PredictionRequest(BaseModel):
     temp: float = Field(..., description="Temperature in °C")
     precip: float = Field(0, ge=0, description="Precipitation in mm over the past hour")
     snow: float = Field(0, ge=0, description="Snowfall in cm over the past hour")
-    shared_match_flag: int = Field(0, ge=0, le=1)
-    wav_match_flag: int = Field(0, ge=0, le=1)
-    access_a_ride_flag: int = Field(0, ge=0, le=1)
 
 
 class SurchargeBreakdown(BaseModel):
@@ -138,8 +135,8 @@ def synthetic_meter_fare(trip_miles: float, trip_time_seconds: float) -> float:
 
     The meter charges $0.70 per 1/5 mile while the cab is faster than 12 mph
     and $0.70 per minute while it is slower, never both, so the billed units
-    are roughly max(5 x miles, minutes). On January 2024 trips this misses by
-    $2.63 on average (notebooks/03_baselines_and_input_error.ipynb).
+    are roughly max(5 x miles, minutes). On late-January 2024 trips this
+    misses by $2.10 on average (notebooks/02_baselines_and_input_error.ipynb).
     """
     minutes = trip_time_seconds / 60.0
     return MINIMUM_FARE + 0.70 * max(5.0 * trip_miles, minutes)
@@ -182,7 +179,7 @@ def predict_fare(trip: PredictionRequest):
     do_borough = ZONE_TO_BOROUGH.get(do_zone, "Unknown")
 
     try:
-        base_fare = max(MINIMUM_FARE, float(model.predict(build_features(trip))[0]))
+        base_fare = max(MINIMUM_FARE, float(model.predict(xgb.DMatrix(build_features(trip)))[0]))
     except Exception:
         logger.exception("Inference failed for %s", trip.model_dump())
         raise HTTPException(status_code=500, detail="Inference failed") from None
