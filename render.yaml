@@ -1,0 +1,29 @@
+# Render Blueprint: deploys the inference service and the gateway as two
+# free web services. The frontend is a static site and goes on Vercel.
+services:
+  - type: web
+    name: nyc-taxi-ml
+    runtime: python
+    plan: free
+    rootDir: service/ml-inference
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+
+  - type: web
+    name: nyc-taxi-gateway
+    runtime: node
+    plan: free
+    rootDir: service/api-gateway
+    buildCommand: npm ci
+    startCommand: node server.js
+    envVars:
+      - key: PYTHON_MICROSERVICE_URL # the nyc-taxi-ml URL, e.g. https://nyc-taxi-ml.onrender.com
+        sync: false
+      - key: ALLOWED_ORIGINS # the Vercel URL of the frontend
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY # optional
+        sync: false

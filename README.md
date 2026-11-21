@@ -127,6 +127,17 @@ jupyter nbconvert --to notebook --execute --inplace 03_training.ipynb
 | Inference | `TAXI_MODEL_PATH` | `service/ml-inference/model.ubj` | Model file |
 | Frontend | `VITE_API_URL` | `http://localhost:5001` | Gateway URL |
 
+## Deploying
+
+Free tiers are enough. The two backend services go on [Render](https://render.com) and the frontend on [Vercel](https://vercel.com).
+
+1. On Render, choose **New → Blueprint** and point it at this repository. `render.yaml` creates `nyc-taxi-ml` and `nyc-taxi-gateway`.
+2. When `nyc-taxi-ml` is live, set the gateway's `PYTHON_MICROSERVICE_URL` to its URL.
+3. On Vercel, import the repository with root directory `service/web-frontend` and set `VITE_API_URL` to the gateway's URL.
+4. Set the gateway's `ALLOWED_ORIGINS` to the Vercel URL.
+
+Free Render services sleep after 15 minutes without traffic, so the first request after a quiet spell takes up to a minute. The page says so while it waits. If you set `GOOGLE_MAPS_API_KEY` on a public deployment, cap the key's daily quota in Google Cloud first.
+
 ## Tests
 
 CI runs on every push: the inference service (pytest and ruff), the gateway (`node:test` with supertest), and the frontend (ESLint and a production build).
