@@ -1,4 +1,35 @@
-/* Minimal global reset — all design tokens live in App.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg: #0b1020;
+  --surface: #121a2e;
+  --surface-raised: #18223a;
+  --border: #243049;
+  --text: #e8edf5;
+  --text-dim: #9aa6bd;
+  --text-faint: #66728a;
+  --blue: #3b82f6;
+  --green: #10b981;
+  --red: #f87171;
+  --yellow: #facc15;
+  --radius: 12px;
+
+  color-scheme: dark;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
+  min-height: 100vh;
+}
+
+button {
+  font: inherit;
 }

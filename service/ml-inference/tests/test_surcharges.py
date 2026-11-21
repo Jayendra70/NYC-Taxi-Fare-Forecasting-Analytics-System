@@ -3,7 +3,7 @@ import pytest
 
 from main import calculate_tlc_surcharges, synthetic_meter_fare
 
-MANHATTAN, BROOKLYN, QUEENS = 1, 2, 3
+MANHATTAN, BROOKLYN, QUEENS = "Manhattan", "Brooklyn", "Queens"
 JFK, LGA, NEWARK = 132, 138, 1
 MIDTOWN, PARK_SLOPE, ASTORIA = 161, 181, 7
 
