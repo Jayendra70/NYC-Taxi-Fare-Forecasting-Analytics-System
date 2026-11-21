@@ -37,8 +37,8 @@ app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_methods=
 
 
 def load_zone_boroughs() -> dict[int, str]:
-    zones = pd.read_csv(BASE_DIR / "data" / "dim_localizacao.csv")
-    return zones.set_index("localizacao_id")["bairro"].to_dict()
+    zones = pd.read_csv(BASE_DIR / "data" / "taxi_zones.csv")
+    return zones.set_index("LocationID")["Borough"].to_dict()
 
 
 def load_route_means() -> dict[str, float]:

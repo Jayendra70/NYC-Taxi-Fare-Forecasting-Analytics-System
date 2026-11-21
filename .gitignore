@@ -49,9 +49,9 @@ dist-ssr/
 *.onnx
 
 # ==========================
-# Data (too large for git)
+# Data (downloaded by the notebooks)
 # ==========================
-service/ml-inference/data/fact_trips_final.csv
+notebooks/data/
 *.parquet
 
 # ==========================
